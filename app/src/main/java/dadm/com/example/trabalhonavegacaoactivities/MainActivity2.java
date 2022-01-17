@@ -8,11 +8,16 @@ import android.view.View;
 import android.widget.EditText;
 import android.widget.Toast;
 
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+
 public class MainActivity2 extends AppCompatActivity {
 
     public static int RESULT_ADD = 1;
     public static int RESULT_CANCEL = 2;
     EditText editTextNome, editTextColor, editTextRegion;
+    FirebaseDatabase firebaseDatabase;
+    DatabaseReference databaseReference;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -28,7 +33,7 @@ public class MainActivity2 extends AppCompatActivity {
         editTextRegion = findViewById(R.id.editTextRegion);
 
         //pega o valor que vem da tela 1 pra editar e seta no nome do time
-        if(getIntent().getExtras() != null){
+        if(getIntent().getExtras() != null) {
             String nome = (String) getIntent().getExtras().get("nome");
             String cores = (String) getIntent().getExtras().get("cores");
             String regiao = (String) getIntent().getExtras().get("regiao");
@@ -54,6 +59,17 @@ public class MainActivity2 extends AppCompatActivity {
         }).addOnFailureListener(er ->{
             Toast.makeText(this, ""+er.getMessage(), Toast.LENGTH_SHORT).show();
         });
+
+        finish();
+    }
+
+    public void editar(View view){
+        Intent intent = new Intent();
+        Time time = new Time();
+        time.setNome(editTextNome.getText().toString().trim());
+        time.setCores(editTextColor.getText().toString().trim());
+        time.setRegiao(editTextRegion.getText().toString().trim());
+        databaseReference.child("Time").child(String.valueOf(time.getId())).setValue(time);
 
         finish();
     }

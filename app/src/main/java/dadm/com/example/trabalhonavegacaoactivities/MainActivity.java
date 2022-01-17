@@ -18,8 +18,11 @@ import android.widget.EditText;
 import android.widget.ListView;
 import android.widget.Toast;
 
+import com.google.firebase.FirebaseApp;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 
 import java.util.ArrayList;
@@ -34,7 +37,10 @@ public class MainActivity extends AppCompatActivity {
     ListView listViewConteudo;
     ArrayList<Time> listaTimes;
     ArrayAdapter adapter;
-    private DAOTime timedao;
+    FirebaseDatabase firebaseDatabase;
+    DatabaseReference databaseReference;
+    Time timeselecionado;
+    Time t = new Time();
 
     Button bt_ir;
 
@@ -56,8 +62,6 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        DAOTime timeDao = new DAOTime();
-
         //representa o conteúdo, o adapter mostra o conteúdo
         listaTimes = new ArrayList<Time>();
 
@@ -74,8 +78,52 @@ public class MainActivity extends AppCompatActivity {
                 selected = position;
              }
         });
+
+        listViewConteudo.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                timeselecionado = (Time)parent.getItemAtPosition(position);
+                timeselecionado.setNome(timeselecionado.getNome());
+                timeselecionado.setCores(timeselecionado.getCores());
+                timeselecionado.setRegiao(timeselecionado.getRegiao());
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+
+            }
+        });
+        inicializarFirebase();
+        eventoDatabase();
     }
-    
+
+    private void eventoDatabase() {
+        databaseReference.child("Time").addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                listaTimes.clear();
+                for(DataSnapshot objetoSnapshot: snapshot.getChildren()){
+                    Time t = objetoSnapshot.getValue(Time.class);
+                    listaTimes.add(t);
+                }
+                adapter.notifyDataSetChanged();
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+
+            }
+        });
+    }
+
+    private void inicializarFirebase() {
+        FirebaseApp.initializeApp(MainActivity.this);
+        firebaseDatabase = FirebaseDatabase.getInstance();
+        firebaseDatabase.setPersistenceEnabled(true);
+        databaseReference = firebaseDatabase.getReference();
+    }
+
+
     public boolean onCreateOptionsMenu(Menu menu){
         MenuInflater inflater = getMenuInflater();
         inflater.inflate(R.menu.main_activity_menu, menu);
@@ -98,6 +146,11 @@ public class MainActivity extends AppCompatActivity {
         return true;
     }
 
+    public void clicarEditar(){
+        Intent intent = new Intent(this, MainActivity2.class);
+        startActivityForResult(intent, REQUEST_EDIT);
+    }
+
     public void clicarAdicionar(){
         Intent intent = new Intent(this, MainActivity2.class);
         startActivityForResult(intent, REQUEST_ADD);
@@ -105,38 +158,13 @@ public class MainActivity extends AppCompatActivity {
 
     public void apagarItem(){
         if(selected >= 0){
-            this.timedao.remove("-MtKdkd3lpFovt7S5_e_").addOnSuccessListener(suc ->{
-                updateItemsList(listaTimes);
-                Toast.makeText(this, "Time is removed", Toast.LENGTH_SHORT).show();
-            }).addOnFailureListener(er ->{
-                Toast.makeText(this, ""+er.getMessage(), Toast.LENGTH_SHORT).show();
-            });
+            listaTimes.remove(selected);
+            Time time = new Time();
+            databaseReference.child("Time").child(String.valueOf(time.getId())).removeValue();
+            adapter.notifyDataSetChanged();
         }else{
             Toast.makeText(this, "Selecione um item para deletar", Toast.LENGTH_SHORT).show();
         }
-    }
-
-    public void clicarEditar(){
-        Intent intent = new Intent(this, MainActivity2.class);
-        Time time = listaTimes.get(selected);
-//        intent.putExtra("nome", time.getNome());
-//        intent.putExtra("cores", time.getCores());
-//        intent.putExtra("regiao", time.getRegiao());
-
-        DAOTime timeDao = new DAOTime();
-
-        HashMap<String, Object> hashMap = new HashMap<>();
-        hashMap.put("nome", time.getNome().toString());
-        hashMap.put("cores", time.getCores().toString());
-        hashMap.put("regiao", time.getRegiao().toString());
-
-        timeDao.update("-MtKdkd3lpFovt7S5_e_", hashMap).addOnSuccessListener(suc ->{
-            Toast.makeText(this, "Time is inserted", Toast.LENGTH_SHORT).show();
-        }).addOnFailureListener(er ->{
-            Toast.makeText(this, ""+er.getMessage(), Toast.LENGTH_SHORT).show();
-        });
-
-        startActivityForResult(intent, REQUEST_EDIT);
     }
 
     @Override
@@ -144,73 +172,26 @@ public class MainActivity extends AppCompatActivity {
         super.onActivityResult(requestCode, resultCode, data);
 
         //fui e voltei da minha main com o botão adicionar
-        Time time = null;
-        if (requestCode == REQUEST_ADD && resultCode == REQUEST_ADD) {
-            time = null;
-            if (data.getExtras() != null) {
-                time = (Time) data.getExtras().get("Adicione um time");
-            }
+        if(requestCode == REQUEST_ADD && resultCode == REQUEST_ADD){
+            String nome = (String)data.getExtras().get("nome");
+            String cores = (String)data.getExtras().get("cores");
+            String regiao = (String)data.getExtras().get("regiao");
+            Time time = new Time(nome, cores, regiao);
 
-            this.timedao.add(time).addOnSuccessListener(success -> {
-                updateItemsList(listaTimes);
-                Toast.makeText(this, "Time is inserted", Toast.LENGTH_SHORT).show();
-            }).addOnFailureListener(er -> {
-                Toast.makeText(this, "" + er.getMessage(), Toast.LENGTH_SHORT).show();
-            });
-
-            this.adapter.notifyDataSetChanged();
-        } else if (requestCode == REQUEST_EDIT && resultCode == REQUEST_ADD) {
-            Time book = null;
-
-            if (data.getExtras() != null) {
-                book = (Time) data.getExtras().get("element_add");
-            }
-
-            String keyUpdate = null;
-
-            for (Time timeBusca : this.listaTimes) {
-                if (timeBusca.getId() == book.getId()) {
-                    keyUpdate = timeBusca.getKey();
-                }
-            }
-
-            HashMap<String, Object> updateTime = new HashMap<>();
-            updateTime.put("id", time.getId());
-            updateTime.put("nome", time.getNome());
-            updateTime.put("cores", time.getCores());
-            updateTime.put("regiao", time.getRegiao());
-
-            this.timedao.update(keyUpdate, updateTime).addOnSuccessListener(success -> {
-                updateItemsList(listaTimes);
-                Toast.makeText(this, "Time is updated", Toast.LENGTH_SHORT).show();
-            }).addOnFailureListener(er -> {
-                Toast.makeText(this, "" + er.getMessage(), Toast.LENGTH_SHORT).show();
-            });
+            listaTimes.add(time);
             adapter.notifyDataSetChanged();
-        } else if (resultCode == MainActivity2.RESULT_CANCEL) {
+        }else if(requestCode == REQUEST_EDIT && resultCode == REQUEST_ADD){
+            String nome = data.getExtras().get("nome").toString();
+            String cores = data.getExtras().get("cores").toString();
+            String regiao = data.getExtras().get("regiao").toString();
+            listaTimes.get(selected).setNome(nome);
+            listaTimes.get(selected).setCores(cores);
+            listaTimes.get(selected).setRegiao(regiao);
+            adapter.notifyDataSetChanged();
+        }
+
+        else if (resultCode == MainActivity2.RESULT_CANCEL){
             Toast.makeText(this, "Cancelado", Toast.LENGTH_LONG).show();
         }
-    }
-
-    private void updateItemsList(List<Time> list){
-        list.clear();
-
-        this.timedao.get().addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot snapshot) {
-                for(DataSnapshot data: snapshot.getChildren()){
-                    Time timeData = data.getValue(Time.class);
-                    timeData.setKey(data.getKey());
-                    list.add(timeData);
-                }
-
-                adapter.notifyDataSetChanged();
-            }
-
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {
-                Toast.makeText(getApplicationContext(), "ERRO:" + error.getMessage() , Toast.LENGTH_SHORT).show();
-            }
-        });
     }
 }

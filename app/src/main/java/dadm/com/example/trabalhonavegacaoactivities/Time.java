@@ -1,5 +1,7 @@
 package dadm.com.example.trabalhonavegacaoactivities;
 
+import com.google.firebase.database.DatabaseReference;
+
 public class Time {
     public static int contadorId = 0;
 
@@ -8,6 +10,8 @@ public class Time {
     private String Cores;
     private String Regiao;
     private String key;
+
+    public Time(){}
 
     public Time(String nome, String cores, String regiao) {
         this.id = contadorId++;
@@ -56,4 +60,5 @@ public class Time {
     public String toString() {
         return Nome + "-" + Cores;
     }
+
 }
